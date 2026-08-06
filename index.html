@@ -88,13 +88,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;co
    starfield and edge-glow sit BEHIND this overlay's own opaque
    background, so they'd never be visible here; this is its own
    independent environment that can pulse on every beat. */
-#bpmExpGlow{position:fixed;inset:0;pointer-events:none;z-index:69;opacity:0;transition:opacity .1s;background:radial-gradient(ellipse at center,rgba(var(--beat-color),.22) 0%,transparent 60%),radial-gradient(ellipse at center,transparent 60%,rgba(var(--beat-color),.16) 100%)}
-#bpmExpGlow.pulse{opacity:1}
+#bpmExpGlow{position:fixed;inset:0;pointer-events:none;z-index:69;opacity:0;transition:opacity .1s;--glow-intensity:1;background:radial-gradient(ellipse at center,rgba(var(--beat-color),.22) 0%,transparent 60%),radial-gradient(ellipse at center,transparent 60%,rgba(var(--beat-color),.16) 100%)}
+#bpmExpGlow.pulse{opacity:var(--glow-intensity)}
 #bpmExpNumber{font-size:5.5rem;font-weight:900;color:rgb(var(--beat-color));text-shadow:0 0 40px rgba(var(--beat-color),.7);line-height:1;transition:transform .08s,text-shadow .08s,color .3s}
 #bpmExpNumber.beat{transform:scale(1.12);text-shadow:0 0 70px rgba(var(--beat-color),1),0 0 120px rgba(var(--beat-color),.6)}
 #bpmExpLabel{font-size:.85rem;letter-spacing:.24em;text-transform:uppercase;color:#9fb3c8;margin-top:6px;margin-bottom:50px}
 #bpmExpBall{
-  width:220px;height:220px;border-radius:50%;
+  width:220px;height:220px;border-radius:50%;--bounce-depth:1;
   background:
     url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3CclipPath%20id%3D%22c%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2249%22/%3E%3C/clipPath%3E%3C/defs%3E%3Cg%20clip-path%3D%22url%28%23c%29%22%20fill%3D%22none%22%20stroke%3D%22%23231005%22%20stroke-width%3D%223.4%22%3E%3Cline%20x1%3D%2250%22%20y1%3D%22-4%22%20x2%3D%2250%22%20y2%3D%22104%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20-4%20104%2050%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20104%20104%2050%22/%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2224%22%20ry%3D%2249%22/%3E%3C/g%3E%3C/svg%3E'),
     radial-gradient(circle at 35% 32%,#ffb35c,#ff8c00 55%,#d9660a 85%);
@@ -104,14 +104,29 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;co
   transform-origin:center 235px;
 }
 #bpmExpBall.bounce{animation-name:bpmExpBounce;animation-timing-function:cubic-bezier(.4,0,.6,1)}
+/* The bounce depth scales with --bounce-depth, set dynamically per
+   beat — the sequence has a real arc across its 10 beats rather than
+   ten identical repetitions, building toward a genuine peak on the
+   final one, the same way a drum fill builds into a crash, not just
+   ten identical clicks of a metronome. */
 @keyframes bpmExpBounce{
   0%{transform:translateY(0) scale(1,1)}
-  35%{transform:translateY(46px) scale(1.14,.82)}
-  65%{transform:translateY(-14px) scale(.94,1.08)}
+  35%{transform:translateY(calc(46px * var(--bounce-depth))) scale(calc(1 + 0.14 * var(--bounce-depth)),calc(1 - 0.18 * var(--bounce-depth)))}
+  65%{transform:translateY(calc(-14px * var(--bounce-depth))) scale(calc(1 - 0.06 * var(--bounce-depth)),calc(1 + 0.08 * var(--bounce-depth)))}
   100%{transform:translateY(0) scale(1,1)}
 }
 #bpmExpFloor{width:260px;height:14px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,140,0,.35),transparent 70%);margin-top:6px}
 #bpmExpSkip{margin-top:56px;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7fa8c0;cursor:pointer}
+/* A subtle shake reserved for the last few beats only — the climax
+   should feel like it's building toward something, not shake the
+   whole time and lose the effect through repetition. */
+#screen-bpm-experience.shake{animation-name:bpmExpShake;animation-timing-function:ease-in-out;--shake-mag:1}
+@keyframes bpmExpShake{
+  0%,100%{transform:translate(0,0)}
+  25%{transform:translate(calc(-4px * var(--shake-mag)),calc(-2px * var(--shake-mag)))}
+  50%{transform:translate(calc(4px * var(--shake-mag)),calc(2px * var(--shake-mag)))}
+  75%{transform:translate(calc(-2px * var(--shake-mag)),calc(1px * var(--shake-mag)))}
+}
 
 #countdown{position:fixed;inset:0;z-index:56;display:none;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#180000 0%,#000 70%)}
 #bigCount{font-size:8rem;font-weight:900;color:#ff1e3c;text-shadow:0 0 60px rgba(255,30,60,.9)}
@@ -428,18 +443,19 @@ $('hearBpmBtn').addEventListener('click',function(){
   // right above it, and the whole environment — the background glow —
   // pulses along with it too, colored to match how fast the number
   // actually is.
-  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber'),glow=$('bpmExpGlow');
+  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber'),glow=$('bpmExpGlow'),expScreen=$('screen-bpm-experience');
   numEl.textContent=lastAvgBpm;
   var rgb=colorForBpm(lastAvgBpm);
-  $('screen-bpm-experience').style.setProperty('--beat-color',rgb.join(','));
-  $('screen-bpm-experience').style.display='flex';
+  expScreen.style.setProperty('--beat-color',rgb.join(','));
+  expScreen.style.display='flex';
 
   var beatMs=Math.round(60000/lastAvgBpm);
   var bounceMs=Math.min(beatMs*0.85,420);
+  var TOTAL_BEATS=10;
   var count=0;
   function tick(){
     if(bpmExpCancelled)return;
-    if(count>=10){
+    if(count>=TOTAL_BEATS){
       beatPreviewPlaying=false;
       btn.disabled=false;
       bpmExpTimer=setTimeout(function(){
@@ -447,6 +463,17 @@ $('hearBpmBtn').addEventListener('click',function(){
       },600);
       return;
     }
+    // The sequence builds a real arc across its 10 beats rather than
+    // repeating identically — the bounce gets deeper, the glow gets
+    // brighter, and only the final few beats pick up a shake that
+    // itself intensifies, so the very last beat lands as a genuine
+    // peak, not just one more repetition of the first.
+    var progress=count/(TOTAL_BEATS-1); // 0 on the first beat, 1 on the last
+    var bounceDepth=0.55+progress*0.8;   // 0.55 -> 1.35
+    var glowIntensity=0.4+progress*0.6;  // 0.4 -> 1.0
+    ball.style.setProperty('--bounce-depth',bounceDepth.toFixed(2));
+    glow.style.setProperty('--glow-intensity',glowIntensity.toFixed(2));
+
     playPreviewDrum();
     ball.classList.remove('bounce');
     glow.classList.remove('pulse');
@@ -456,6 +483,20 @@ $('hearBpmBtn').addEventListener('click',function(){
     ball.classList.add('bounce');
     glow.classList.add('pulse');
     numEl.classList.add('beat');
+
+    // Shake only kicks in for the last 3 beats, building toward the
+    // final one — reserved for the climax instead of running the
+    // whole time, where it would just become noise.
+    if(count>=TOTAL_BEATS-3){
+      var shakeProgress=(count-(TOTAL_BEATS-3))/2; // 0 -> 1 across the last 3 beats
+      var shakeMs=Math.min(beatMs*0.7,220);
+      expScreen.classList.remove('shake');
+      void expScreen.offsetWidth;
+      expScreen.style.animationDuration=shakeMs+'ms';
+      expScreen.style.setProperty('--shake-mag',(0.6+shakeProgress*1.2).toFixed(2));
+      expScreen.classList.add('shake');
+    }
+
     var pulseFadeMs=Math.min(140,bounceMs*0.35);
     setTimeout(function(){numEl.classList.remove('beat');glow.classList.remove('pulse')},pulseFadeMs);
     count++;
