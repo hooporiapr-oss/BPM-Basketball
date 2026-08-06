@@ -3,47 +3,44 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Dribbler Test | BPM Basketball</title>
+<title>Ball Dribble Test | BPM Basketball</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;background:#000;overflow:hidden}
 #stage{
-  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;
+  position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;
   background:radial-gradient(ellipse at center,#180000 0%,#000 70%);
 }
 
 #bpmReadout{
   font-family:Arial,Helvetica,sans-serif;font-weight:900;font-size:2rem;color:#ffd35a;
-  text-shadow:0 0 30px rgba(255,211,90,.6);letter-spacing:.04em;
+  text-shadow:0 0 30px rgba(255,211,90,.6);letter-spacing:.04em;text-align:center;
 }
 #bpmReadout span{font-size:1rem;color:#9fb3c8;letter-spacing:.2em;text-transform:uppercase;display:block;margin-top:4px;font-weight:700}
 
-#figureWrap{width:300px;height:420px;position:relative}
-#figureSvg{width:100%;height:100%;overflow:visible;position:absolute;top:0;left:0}
+#courtWrap{width:200px;height:280px;position:relative}
 
-/* The figure is a flat, rim-lit silhouette — deliberately not
-   attempting anatomical realism. This matches the neon/arcade
-   language already established across the platform, and it's a look
-   that reads clean and confident in motion rather than uncanny. */
-.fig-fill{fill:#1a0b16}
-.fig-rim{fill:none;stroke:#ff1e3c;stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;opacity:.85}
-
-/* Floor shadow — grounds the figure and gives the ball's bounce a
-   real surface to react against. */
-#floorShadow{fill:rgba(124,58,237,.25)}
+/* Floor — a real ground reference now that there's no figure to
+   imply one. The shadow beneath it stretches and fades with the
+   ball's own height, so the bounce still reads as hitting a surface. */
+#floorLine{position:absolute;left:0;right:0;bottom:24px;height:2px;background:linear-gradient(90deg,transparent,rgba(124,58,237,.5),transparent)}
+#floorShadow{
+  position:absolute;bottom:16px;left:50%;width:70px;height:16px;border-radius:50%;
+  background:rgba(124,58,237,.35);transform:translate(-50%,0);
+  transition:transform .05s linear,opacity .05s linear;
+}
 
 /* Ball — same real seam-line texture used everywhere else on the
    platform, so this is recognizably the same ball, not a new prop. */
 #ball{
-  width:54px;height:54px;border-radius:50%;position:absolute;
+  width:64px;height:64px;border-radius:50%;position:absolute;
   background:
     url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3CclipPath%20id%3D%22c%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2249%22/%3E%3C/clipPath%3E%3C/defs%3E%3Cg%20clip-path%3D%22url%28%23c%29%22%20fill%3D%22none%22%20stroke%3D%22%23231005%22%20stroke-width%3D%224%22%3E%3Cline%20x1%3D%2250%22%20y1%3D%22-4%22%20x2%3D%2250%22%20y2%3D%22104%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20-4%20104%2050%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20104%20104%2050%22/%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2224%22%20ry%3D%2249%22/%3E%3C/g%3E%3C/svg%3E'),
     radial-gradient(circle at 35% 32%,#ffb35c,#ff8c00 55%,#d9660a 85%);
   background-size:100% 100%,100% 100%;
-  box-shadow:0 0 24px rgba(255,140,0,.7);
+  box-shadow:0 0 26px rgba(255,140,0,.75);
   left:50%;top:0;
   transform-origin:center center;
-  transform:translate(-50%,-50%);
 }
 
 .controls{display:flex;gap:10px;align-items:center}
@@ -60,45 +57,9 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 <div id="stage">
   <div id="bpmReadout">120<span>BPM · Dribble Rate</span></div>
 
-  <div id="figureWrap">
-    <svg id="figureSvg" viewBox="0 0 300 420">
-      <ellipse id="floorShadow" cx="150" cy="404" rx="90" ry="12"></ellipse>
-
-      <!-- Back leg (bent, planted) -->
-      <path class="fig-fill" d="M 130,230 L 108,300 L 100,300 L 95,395 L 118,395 L 128,305 L 150,240 Z"></path>
-      <path class="fig-rim" d="M 130,230 L 108,300 L 100,300 L 95,395 L 118,395 L 128,305 L 150,240 Z"></path>
-
-      <!-- Front leg (bent, weight forward) -->
-      <path class="fig-fill" d="M 158,232 L 178,290 L 205,300 L 210,340 L 190,340 L 178,305 L 150,250 Z"></path>
-      <path class="fig-rim" d="M 158,232 L 178,290 L 205,300 L 210,340 L 190,340 L 178,305 L 150,250 Z"></path>
-
-      <!-- Torso, athletic forward lean -->
-      <path class="fig-fill" d="M 128,110 L 165,100 L 178,130 L 168,235 L 128,238 L 118,150 Z"></path>
-      <path class="fig-rim" d="M 128,110 L 165,100 L 178,130 L 168,235 L 128,238 L 118,150 Z"></path>
-
-      <!-- Head -->
-      <circle class="fig-fill" cx="152" cy="72" r="26"></circle>
-      <circle class="fig-rim" cx="152" cy="72" r="26"></circle>
-
-      <!-- Off-arm, tucked, static -->
-      <path class="fig-fill" d="M 130,115 L 112,150 L 118,190 L 130,188 L 126,152 L 140,122 Z"></path>
-      <path class="fig-rim" d="M 130,115 L 112,150 L 118,190 L 130,188 L 126,152 L 140,122 Z"></path>
-
-      <!-- Dribbling arm: upper arm pivots at the shoulder, forearm
-           pivots at the elbow — a real two-segment rig, not a single
-           rigid piece, so the motion actually reads as an arm. -->
-      <g id="upperArm" style="transform-origin:172px 118px">
-        <path class="fig-fill" d="M 172,118 L 200,150 L 190,162 L 165,132 Z"></path>
-        <path class="fig-rim" d="M 172,118 L 200,150 L 190,162 L 165,132 Z"></path>
-        <g id="forearm" style="transform-origin:196px 156px">
-          <path class="fig-fill" d="M 196,156 L 208,202 L 196,206 L 186,160 Z"></path>
-          <path class="fig-rim" d="M 196,156 L 208,202 L 196,206 L 186,160 Z"></path>
-          <circle class="fig-fill" cx="200" cy="206" r="9"></circle>
-          <circle class="fig-rim" cx="200" cy="206" r="9"></circle>
-        </g>
-      </g>
-    </svg>
-
+  <div id="courtWrap">
+    <div id="floorShadow"></div>
+    <div id="floorLine"></div>
     <div id="ball"></div>
   </div>
 
@@ -109,9 +70,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden}
 </div>
 
 <script>
-var upperArm = document.getElementById('upperArm');
-var forearm = document.getElementById('forearm');
 var ball = document.getElementById('ball');
+var floorShadow = document.getElementById('floorShadow');
 var bpmReadout = document.getElementById('bpmReadout');
 var playBtn = document.getElementById('playBtn');
 var bpmSlider = document.getElementById('bpmSlider');
@@ -121,44 +81,32 @@ var rafId = null;
 var cycleStart = 0;
 var bpm = 120;
 
-// Hand contact point in the SVG's own coordinate space (where the
-// forearm's rest position places the hand) — the ball's resting
-// bounce height is anchored to this, not a guessed number, so the
-// hand and ball actually meet visually rather than just coincidentally
-// overlapping.
-var HAND_CONTACT_Y = 206; // svg units, matches the hand circle's cy
-var FLOOR_Y = 395; // svg units, matches the feet
+var TOP_Y = 20;   // ball's top position (svg-like px units within #courtWrap)
+var FLOOR_Y = 200; // where the ball's center sits at the bottom of the bounce
 
-function setArmAngles(shoulderDeg, elbowDeg){
-  upperArm.style.transform = 'rotate(' + shoulderDeg + 'deg)';
-  forearm.style.transform = 'rotate(' + elbowDeg + 'deg)';
-}
-
-// One full dribble cycle: the hand meets the ball, pushes it down,
-// recovers upward while the ball falls to the floor and bounces back
-// up to meet the hand again. Both the arm's rotation and the ball's
-// height are driven from the SAME progress value each frame, so they
-// are guaranteed to stay in sync — no separate animations that can
-// drift apart from each other over time.
+// One full bounce cycle: the ball drops from its highest point,
+// compresses slightly on floor contact, then rises back up. A real
+// parabolic arc, not a linear slide, with a genuine squash-and-stretch
+// on impact so the bounce reads as hitting a real surface.
 function frame(progress){
-  // progress: 0 to 1 across one full cycle
-
-  // Arm: at progress 0, the hand is at the ball (about to push down).
-  // It pushes through to about 0.35, then recovers back up to meet
-  // the ball again by progress 1.
-  var pushPhase = progress < 0.35 ? progress / 0.35 : 1 - (progress - 0.35) / 0.65;
-  var shoulderDeg = 8 + pushPhase * 14; // small, natural shoulder motion
-  var elbowDeg = 10 + pushPhase * 26;   // the real motion lives in the elbow
-  setArmAngles(shoulderDeg, elbowDeg);
-
-  // Ball: a real parabolic bounce, not a linear slide — starts at the
-  // hand, falls to the floor, bounces back up to the hand.
-  var ballProgress = (progress + 0.02) % 1; // ball trails the hand by a hair, like a real push
-  var height = 4 * ballProgress * (1 - ballProgress); // 0 at both ends, 1 at the peak... inverted below
-  var travel = FLOOR_Y - HAND_CONTACT_Y;
-  var y = HAND_CONTACT_Y + travel * (1 - height);
+  var height = 4 * progress * (1 - progress); // 0 at both ends, 1 at the peak
+  var travel = FLOOR_Y - TOP_Y;
+  var y = TOP_Y + travel * (1 - height);
   ball.style.top = y + 'px';
-  ball.style.left = '204px';
+  ball.style.left = '100px';
+
+  // Squash grows the closer the ball gets to the floor, easing back to
+  // its true round shape at the peak — subtle, not cartoonish.
+  var nearFloor = 1 - height; // 1 at the floor, 0 at the peak
+  var squash = 1 - nearFloor * 0.16;
+  var stretch = 1 + nearFloor * 0.16;
+  ball.style.transform = 'translate(-50%,-50%) scale(' + stretch + ',' + squash + ')';
+
+  // The floor shadow grows and darkens as the ball nears the ground,
+  // shrinks and fades as it rises — a cheap but effective depth cue.
+  var shadowScale = 0.55 + nearFloor * 0.6;
+  floorShadow.style.transform = 'translate(-50%,0) scale(' + shadowScale + ')';
+  floorShadow.style.opacity = 0.2 + nearFloor * 0.4;
 }
 
 function loop(ts){
@@ -188,7 +136,7 @@ bpmSlider.addEventListener('input', function(){
   cycleStart = 0; // resync so the tempo change doesn't jump mid-cycle
 });
 
-// Draw one static frame at rest so the figure isn't blank before Play is pressed.
+// Draw one static frame at rest so the ball isn't blank before Play is pressed.
 frame(0);
 </script>
 </body>
