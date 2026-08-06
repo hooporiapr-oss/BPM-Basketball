@@ -127,28 +127,19 @@ body.buzzer-shake{animation:buzzerShake .5s cubic-bezier(.36,.07,.19,.97) 2}
 #bpmExpNumber.beat{transform:scale(1.12);text-shadow:0 0 70px rgba(var(--beat-color),1),0 0 120px rgba(var(--beat-color),.6)}
 #bpmExpLabel{font-size:.85rem;letter-spacing:.24em;text-transform:uppercase;color:#9fb3c8;margin-top:6px;margin-bottom:50px}
 #bpmExpBall{
-  width:220px;height:220px;border-radius:50%;--bounce-depth:1;
+  width:220px;height:220px;border-radius:50%;
   background:
     url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3CclipPath%20id%3D%22c%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2249%22/%3E%3C/clipPath%3E%3C/defs%3E%3Cg%20clip-path%3D%22url%28%23c%29%22%20fill%3D%22none%22%20stroke%3D%22%23231005%22%20stroke-width%3D%223.4%22%3E%3Cline%20x1%3D%2250%22%20y1%3D%22-4%22%20x2%3D%2250%22%20y2%3D%22104%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20-4%20104%2050%22/%3E%3Cpath%20d%3D%22M%20-4%2050%20Q%2050%20104%20104%2050%22/%3E%3Cellipse%20cx%3D%2250%22%20cy%3D%2250%22%20rx%3D%2224%22%20ry%3D%2249%22/%3E%3C/g%3E%3C/svg%3E'),
     radial-gradient(circle at 35% 32%,#ffb35c,#ff8c00 55%,#d9660a 85%);
   background-size:100% 100%,100% 100%;
   box-shadow:0 0 60px rgba(255,140,0,.8),0 0 120px rgba(255,140,0,.4);
   transform:translateY(0) scale(1);
-  transform-origin:center 235px;
 }
-#bpmExpBall.bounce{animation-name:bpmExpBounce;animation-timing-function:cubic-bezier(.4,0,.6,1)}
-/* The bounce depth scales with --bounce-depth, set dynamically per
-   beat — the sequence has a real arc across its 10 beats rather than
-   ten identical repetitions, building toward a genuine peak on the
-   final one, the same way a drum fill builds into a crash, not just
-   ten identical clicks of a metronome. */
-@keyframes bpmExpBounce{
-  0%{transform:translateY(0) scale(1,1)}
-  35%{transform:translateY(calc(46px * var(--bounce-depth))) scale(calc(1 + 0.14 * var(--bounce-depth)),calc(1 - 0.18 * var(--bounce-depth)))}
-  65%{transform:translateY(calc(-14px * var(--bounce-depth))) scale(calc(1 - 0.06 * var(--bounce-depth)),calc(1 + 0.08 * var(--bounce-depth)))}
-  100%{transform:translateY(0) scale(1,1)}
-}
-#bpmExpFloor{width:260px;height:14px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(255,140,0,.35),transparent 70%);margin-top:6px}
+/* Floor shadow — grounds the ball with a real surface to react
+   against, growing and darkening as it nears the floor, shrinking and
+   fading as it rises. The same depth cue used in the standalone test,
+   now carrying over into the real experience. */
+#bpmExpFloor{width:170px;height:26px;border-radius:50%;background:rgba(124,58,237,.3);margin-top:14px;transition:transform .05s linear,opacity .05s linear}
 #bpmExpSkip{margin-top:56px;font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:#7fa8c0;cursor:pointer}
 /* A subtle shake reserved for the last few beats only — the climax
    should feel like it's building toward something, not shake the
@@ -559,6 +550,7 @@ var bpmExpTimer=null,bpmExpCancelled=false;
 function closeBpmExperience(){
   bpmExpCancelled=true;
   clearTimeout(bpmExpTimer);
+  cancelAnimationFrame(bpmExpTimer);
   $('screen-bpm-experience').style.display='none';
   beatPreviewPlaying=false;
   $('hearBpmBtn').disabled=false;
@@ -604,71 +596,99 @@ $('hearBpmBtn').addEventListener('click',function(){
   btn.disabled=true;
 
   // The full-screen takeover — this moment is meant to be genuinely
-  // felt, not glanced past inside a small button. A large basketball
-  // bounces on every beat while the BPM number itself pulses in sync,
-  // right above it, and the whole environment — the background glow —
-  // pulses along with it too, colored to match how fast the number
-  // actually is.
-  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber'),glow=$('bpmExpGlow'),expScreen=$('screen-bpm-experience');
+  // felt, not glanced past inside a small button. A real basketball
+  // bounce — the same physically grounded motion proven in the
+  // standalone dribble test, complete with squash-and-stretch and a
+  // reactive floor shadow — replaces the old fixed-shape keyframe
+  // animation. It's driven continuously, frame by frame, off the
+  // exact same clock as the drum hits and the momentum arc, so
+  // nothing can drift out of sync with anything else.
+  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber'),glow=$('bpmExpGlow'),floor=$('bpmExpFloor'),expScreen=$('screen-bpm-experience');
   numEl.textContent=lastAvgBpm;
   var rgb=colorForBpm(lastAvgBpm);
   expScreen.style.setProperty('--beat-color',rgb.join(','));
   expScreen.style.display='flex';
 
   var beatMs=Math.round(60000/lastAvgBpm);
-  var bounceMs=Math.min(beatMs*0.85,420);
   var TOTAL_BEATS=10;
-  var count=0;
-  function tick(){
+  var BASE_TRAVEL=90; // px the ball drops at bounce-depth 1.0
+  var seqStart=0;
+  var lastBeatIdx=-1;
+
+  function expLoop(ts){
     if(bpmExpCancelled)return;
-    if(count>=TOTAL_BEATS){
+    if(!seqStart)seqStart=ts;
+    var elapsed=ts-seqStart;
+    var beatIdx=Math.floor(elapsed/beatMs);
+
+    if(beatIdx>=TOTAL_BEATS){
       beatPreviewPlaying=false;
       btn.disabled=false;
+      ball.style.transform='translateY(0) scale(1,1)';
+      floor.style.transform='scale(1)';
+      floor.style.opacity='.3';
       bpmExpTimer=setTimeout(function(){
-        if(!bpmExpCancelled)$('screen-bpm-experience').style.display='none';
+        if(!bpmExpCancelled)expScreen.style.display='none';
       },600);
       return;
     }
+
     // The sequence builds a real arc across its 10 beats rather than
     // repeating identically — the bounce gets deeper, the glow gets
     // brighter, and only the final few beats pick up a shake that
     // itself intensifies, so the very last beat lands as a genuine
     // peak, not just one more repetition of the first.
-    var progress=count/(TOTAL_BEATS-1); // 0 on the first beat, 1 on the last
-    var bounceDepth=0.55+progress*0.8;   // 0.55 -> 1.35
-    var glowIntensity=0.4+progress*0.6;  // 0.4 -> 1.0
-    ball.style.setProperty('--bounce-depth',bounceDepth.toFixed(2));
-    glow.style.setProperty('--glow-intensity',glowIntensity.toFixed(2));
+    var seqProgress=beatIdx/(TOTAL_BEATS-1); // 0 on the first beat, 1 on the last
+    var bounceDepth=0.55+seqProgress*0.8;    // 0.55 -> 1.35
+    var glowIntensity=0.4+seqProgress*0.6;   // 0.4 -> 1.0
 
-    playPreviewDrum();
-    ball.classList.remove('bounce');
-    glow.classList.remove('pulse');
-    numEl.classList.remove('beat');
-    void ball.offsetWidth;
-    ball.style.animationDuration=bounceMs+'ms';
-    ball.classList.add('bounce');
-    glow.classList.add('pulse');
-    numEl.classList.add('beat');
+    if(beatIdx!==lastBeatIdx){
+      lastBeatIdx=beatIdx;
+      playPreviewDrum();
+      numEl.classList.remove('beat');
+      void numEl.offsetWidth;
+      numEl.classList.add('beat');
+      setTimeout(function(){numEl.classList.remove('beat')},Math.min(140,beatMs*0.35));
 
-    // Shake only kicks in for the last 3 beats, building toward the
-    // final one — reserved for the climax instead of running the
-    // whole time, where it would just become noise.
-    if(count>=TOTAL_BEATS-3){
-      var shakeProgress=(count-(TOTAL_BEATS-3))/2; // 0 -> 1 across the last 3 beats
-      var shakeMs=Math.min(beatMs*0.7,220);
-      expScreen.classList.remove('shake');
-      void expScreen.offsetWidth;
-      expScreen.style.animationDuration=shakeMs+'ms';
-      expScreen.style.setProperty('--shake-mag',(0.6+shakeProgress*1.2).toFixed(2));
-      expScreen.classList.add('shake');
+      // Shake only kicks in for the last 3 beats, building toward the
+      // final one — reserved for the climax instead of running the
+      // whole time, where it would just become noise.
+      if(beatIdx>=TOTAL_BEATS-3){
+        var shakeProgress=(beatIdx-(TOTAL_BEATS-3))/2; // 0 -> 1 across the last 3 beats
+        var shakeMs=Math.min(beatMs*0.7,220);
+        expScreen.classList.remove('shake');
+        void expScreen.offsetWidth;
+        expScreen.style.animationDuration=shakeMs+'ms';
+        expScreen.style.setProperty('--shake-mag',(0.6+shakeProgress*1.2).toFixed(2));
+        expScreen.classList.add('shake');
+      }
     }
 
-    var pulseFadeMs=Math.min(140,bounceMs*0.35);
-    setTimeout(function(){numEl.classList.remove('beat');glow.classList.remove('pulse')},pulseFadeMs);
-    count++;
-    bpmExpTimer=setTimeout(tick,beatMs);
+    // Real bounce physics: a parabolic arc, not a linear slide, with
+    // squash-and-stretch and a reactive floor shadow — same mechanic
+    // proven in the standalone test, now scaled by the momentum arc's
+    // depth so later beats hit harder than earlier ones.
+    var beatProgress=(elapsed%beatMs)/beatMs;
+    var height=4*beatProgress*(1-beatProgress); // 0 at both ends, 1 at the peak
+    var nearFloor=1-height;
+    var yOffset=BASE_TRAVEL*bounceDepth*nearFloor;
+    var squash=1-nearFloor*0.16*bounceDepth;
+    var stretch=1+nearFloor*0.16*bounceDepth;
+    ball.style.transform='translateY('+yOffset+'px) scale('+stretch+','+squash+')';
+
+    var shadowScale=0.55+nearFloor*0.6;
+    floor.style.transform='scale('+shadowScale+')';
+    floor.style.opacity=(0.2+nearFloor*0.4).toFixed(2);
+
+    // The glow breathes continuously with the ball's own height,
+    // brightest right as it lands, rather than a discrete on/off
+    // flash once per beat.
+    glow.classList.add('pulse');
+    glow.style.setProperty('--glow-intensity',(glowIntensity*nearFloor).toFixed(2));
+
+    bpmExpTimer=requestAnimationFrame(expLoop);
   }
-  tick();
+  bpmExpTimer=requestAnimationFrame(expLoop);
 });
 
 // The final buzzer — a real, harsh sustained horn tone, same synthesis
