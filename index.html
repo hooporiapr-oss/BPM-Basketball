@@ -83,9 +83,15 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;co
 /* The full-screen "Hear Your BPM" experience — the moment gets the
    whole screen instead of living inside a small button, since this is
    meant to be genuinely felt, not glanced past. */
-#screen-bpm-experience{position:fixed;inset:0;z-index:70;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#180000 0%,#000 70%);text-align:center}
-#bpmExpNumber{font-size:5.5rem;font-weight:900;color:#ffd35a;text-shadow:0 0 40px rgba(255,211,90,.7);line-height:1;transition:transform .08s,text-shadow .08s}
-#bpmExpNumber.beat{transform:scale(1.12);text-shadow:0 0 70px rgba(255,211,90,1),0 0 120px rgba(255,211,90,.6)}
+#screen-bpm-experience{position:fixed;inset:0;z-index:70;display:none;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#180000 0%,#000 70%);text-align:center;--beat-color:255,211,90}
+/* A dedicated glow scoped to the experience itself — the global
+   starfield and edge-glow sit BEHIND this overlay's own opaque
+   background, so they'd never be visible here; this is its own
+   independent environment that can pulse on every beat. */
+#bpmExpGlow{position:fixed;inset:0;pointer-events:none;z-index:69;opacity:0;transition:opacity .1s;background:radial-gradient(ellipse at center,rgba(var(--beat-color),.22) 0%,transparent 60%),radial-gradient(ellipse at center,transparent 60%,rgba(var(--beat-color),.16) 100%)}
+#bpmExpGlow.pulse{opacity:1}
+#bpmExpNumber{font-size:5.5rem;font-weight:900;color:rgb(var(--beat-color));text-shadow:0 0 40px rgba(var(--beat-color),.7);line-height:1;transition:transform .08s,text-shadow .08s,color .3s}
+#bpmExpNumber.beat{transform:scale(1.12);text-shadow:0 0 70px rgba(var(--beat-color),1),0 0 120px rgba(var(--beat-color),.6)}
 #bpmExpLabel{font-size:.85rem;letter-spacing:.24em;text-transform:uppercase;color:#9fb3c8;margin-top:6px;margin-bottom:50px}
 #bpmExpBall{
   width:220px;height:220px;border-radius:50%;
@@ -190,6 +196,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:Arial,sans-serif;co
 
 <!-- The full-screen "Hear Your BPM" experience -->
 <div id="screen-bpm-experience">
+  <div id="bpmExpGlow"></div>
   <div id="bpmExpNumber">0</div>
   <div id="bpmExpLabel">BPM</div>
   <div id="bpmExpBall"></div>
@@ -381,6 +388,33 @@ $('screen-bpm-experience').addEventListener('click',function(e){
   closeBpmExperience();
 });
 
+// Maps a BPM value to a color — cool blue for a calm pace, through
+// gold at a moderate one, into hot red for something genuinely fast.
+// The color itself communicates "how fast" before anyone reads the
+// number, the same way a real tachometer redlines into a warning
+// color rather than just showing a bigger digit.
+function colorForBpm(bpm){
+  var stops=[
+    {at:60,  rgb:[80,170,255]},
+    {at:140, rgb:[255,211,90]},
+    {at:220, rgb:[255,90,60]}
+  ];
+  if(bpm<=stops[0].at)return stops[0].rgb;
+  if(bpm>=stops[stops.length-1].at)return stops[stops.length-1].rgb;
+  for(var i=0;i<stops.length-1;i++){
+    var a=stops[i],b=stops[i+1];
+    if(bpm>=a.at&&bpm<=b.at){
+      var t=(bpm-a.at)/(b.at-a.at);
+      return [
+        Math.round(a.rgb[0]+(b.rgb[0]-a.rgb[0])*t),
+        Math.round(a.rgb[1]+(b.rgb[1]-a.rgb[1])*t),
+        Math.round(a.rgb[2]+(b.rgb[2]-a.rgb[2])*t)
+      ];
+    }
+  }
+  return stops[stops.length-1].rgb;
+}
+
 $('hearBpmBtn').addEventListener('click',function(){
   if(beatPreviewPlaying||lastAvgBpm<=0)return;
   beatPreviewPlaying=true;
@@ -391,9 +425,13 @@ $('hearBpmBtn').addEventListener('click',function(){
   // The full-screen takeover — this moment is meant to be genuinely
   // felt, not glanced past inside a small button. A large basketball
   // bounces on every beat while the BPM number itself pulses in sync,
-  // right above it.
-  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber');
+  // right above it, and the whole environment — the background glow —
+  // pulses along with it too, colored to match how fast the number
+  // actually is.
+  var ball=$('bpmExpBall'),numEl=$('bpmExpNumber'),glow=$('bpmExpGlow');
   numEl.textContent=lastAvgBpm;
+  var rgb=colorForBpm(lastAvgBpm);
+  $('screen-bpm-experience').style.setProperty('--beat-color',rgb.join(','));
   $('screen-bpm-experience').style.display='flex';
 
   var beatMs=Math.round(60000/lastAvgBpm);
@@ -411,12 +449,15 @@ $('hearBpmBtn').addEventListener('click',function(){
     }
     playPreviewDrum();
     ball.classList.remove('bounce');
+    glow.classList.remove('pulse');
     numEl.classList.remove('beat');
     void ball.offsetWidth;
     ball.style.animationDuration=bounceMs+'ms';
     ball.classList.add('bounce');
+    glow.classList.add('pulse');
     numEl.classList.add('beat');
-    setTimeout(function(){numEl.classList.remove('beat')},Math.min(140,bounceMs*0.35));
+    var pulseFadeMs=Math.min(140,bounceMs*0.35);
+    setTimeout(function(){numEl.classList.remove('beat');glow.classList.remove('pulse')},pulseFadeMs);
     count++;
     bpmExpTimer=setTimeout(tick,beatMs);
   }
